@@ -16,41 +16,49 @@ private:
 	const float lr = 0.01;
 	const static int size = 2;
 	float weights[size];
-	float* weightsExtra;
 	std::vector<std::tuple<int, int>> MINMAX;
+	std::vector<float> weightsExtra;
 
-	std::function<int(const std::vector<int>&)> answerFunction;
+	std::function<int(const std::vector<double>&)> answerFunction;
 
 public:
-
-	//COMMENTS: after polishing everything up remove the weights, and only keep the weightsExtra (change it back to weights normally so you dont need to keep typing all that)
-	percSM(std::function<int(const std::vector<int>&)> func, const int sizeE = 2) : answerFunction(func) {
-		weightsExtra = new float[sizeE];
-
-		//srand(time(0));
-		for (int i = 0; i < size; i++) {
-			weights[i] = (static_cast<double>(rand()) / RAND_MAX) * (rand() % 2 == 0 ? -1 : 1);
+	percSM(std::function<int(const std::vector<double>&)> func, const int sizeE = 2) : answerFunction(func), weightsExtra(sizeE) {
+		if (sizeE < 2) {
+			std::cout << "The size of the weightsExtra is less than 2, please make sure it is greater than 2, if this is being done intentionally add a function to support this" << std::endl;
 		}
-
+		
+		//initialize the weightsExtra
 		for (int i = 0; i < sizeE; i++) {
 			weightsExtra[i] = (static_cast<double>(rand()) / RAND_MAX) * (rand() % 2 == 0 ? -1 : 1);
+			std::cout << "initialized weightsExtra once" << std::endl;
+		}
+		std::cout << std::endl;
+	}
+
+	static int Labels(std::string label) {
+		if (label == "MINMAX100") {
+			return 0;
+		}
+		else if (label == "MINMAX50") {
+			return 1;
+		}
+		else if (label == "MINMAX10") {
+			return 2;
+		}
+		else if (label == "MINMAX5") {
+			return 3;
 		}
 	}
 
-	~percSM() {
-		delete[] weightsExtra;
-	}
-
-
-	//COMMENTS: check if we need to add the tuples in order all the time or is there any kind of 'filter' we need to add
-	void AddToTupleVector(std::tuple<int, int>& tup) {
-		MINMAX.push_back(tup);
-	}
-
-	void MinMax(int input, std::tuple<int, int>& XMinMax) {
-		auto scaler = [&](int x) { return static_cast<double>(x - std::get<0>(XMinMax)) / (std::get<1>(XMinMax) - std::get<0>(XMinMax)); };
-		input = scaler(input);
-	}
+	static void Minmaxer_TwoDiff(std::vector<double>& inputs, std::vector<std::tuple<int, int>>& MinMaxArrays, std::vector<std::string>& Label) {
+		for (int i = 0; i < inputs.size(); i++) {
+			auto scaler = [&](double x) {
+				double NewNumber = static_cast<double>(x - std::get<0>(MinMaxArrays[Labels(Label[i])])) / (std::get<1>(MinMaxArrays[Labels(Label[i])]) - std::get<0>(MinMaxArrays[Labels(Label[i])]));
+				return NewNumber;
+				};
+			inputs[i] = scaler(inputs[i]);
+		}
+	} 
 
 	//standard funtions
 	int sigmoid(double x) {
@@ -64,90 +72,57 @@ public:
 		return -1;
 	}
 
-	int guessSM(std::vector<int>& inputs, int vectorTupNum, int MINMAXVersion) {
-		double sum = 0;
-		MinMax(inputs[vectorTupNum], MINMAX[MINMAXVersion]);
-		for (int i = 0; i < vectorTupNum; i++) {
-			sum += weights[i] * inputs[i];
-		}
+    int guessSMExtra(std::vector<double>& inputs, std::vector<std::tuple<int, int>>& MinMax, std::vector<std::string>& Label) {
+        double sum = 0;
+        Minmaxer_TwoDiff(inputs, MinMax, Label);
+        for (int i = 0; i < weightsExtra.size(); i++) {
+            sum += weightsExtra[i] * inputs[i];
+        }
 
-		//std::cout << "The sum of the guess is " << sum << std::endl;
+		/*
+        // Add debugging code to print the values of weightsExtra and inputs
+        std::cout << "weightsExtra: ";
+        for (int i = 0; i < weightsExtra.size(); i++) {
+            std::cout << weightsExtra[i] << " ";
+        }
+        std::cout << std::endl;
 
-		return sigmoid(sum);
-	}
+        std::cout << "inputs: ";
+        for (int i = 0; i < inputs.size(); i++) {
+            std::cout << inputs[i] << " ";
+        }
+        std::cout << std::endl;
+		*/
 
-	int guessSMExtra(std::vector<int>& inputs, int MINMAXVersion) {
-		double sum = 0;
-		//MinMax(inputs, MINMAX[MINMAXVersion]);
-		for (int i = 0; i < inputs.size(); i++) {
-			sum += weightsExtra[i] * inputs[i];
-		}
-
-		//std::cout << "The sum of the guess is " << sum << std::endl;
-
-		return sigmoid(sum);
-	}
-
-	//old answer function
-	/*
-	int answer(const std::vector<float> inputs) {
-		float tempsum = inputs[0] + inputs[1];
-
-		if (tempsum >= 0) {
-			return 1;
-		}
-		return -1;
-	}
-	*/
+        return sigmoid(sum);
+    }
 
 	//training the perceptron
-	int getAnswer(std::vector<int> inputs) {
+	int getAnswer(std::vector<double>& inputs) {
 		return answerFunction(inputs);
 	}
 
-	int calculateError(int target, int guessV) {
-		return target - guessV;
+	int calculateError(int target, int guess) {
+		return target - guess;
 	}
 
-	void updateWeights(int error, std::vector<int> inputs) {
-		for (int i = 0; i < size; i++) {
-			weights[i] += error * lr * inputs[i];
+	void updateWeightsExtra(int error, std::vector<double>& inputs) {
+		for (int i = 0; i < weightsExtra.size(); i++) {
+			this->weightsExtra[i] += error * lr * inputs[i];
 		}
 	}
 
-	void updateWeightsExtra(int error, std::vector<int> inputs) {
-		for (int i = 0; i < inputs.size(); i++) {
-			weights[i] += error * lr * inputs[i];
-		}
-	}
-
-	void trainSM(std::vector<int> inputs, int MINMAXVersion) {
-		int guessV = guessSM(inputs, inputs.size(), MINMAXVersion);
-		int answerV = getAnswer(inputs);
-		int error = calculateError(answerV, guessV);
-		updateWeights(error, inputs);
-
-		// if something gets weird start adding verbose output to get the exact weights everytime
-		/*
-		std::cout << "Error: " << error << " | Updated weights: [" << weights[0] << ", " << weights[1] << "]" << std::endl;
-		*/
-	}
-	
-	void trainSMExtra(std::vector<int> inputs, int MINMAXVersion) {
-		int guessV = guessSMExtra(inputs, MINMAXVersion);
+	void trainSMExtra(std::vector<double>& inputs, std::vector<std::tuple<int, int>>& MinMax, std::vector<std::string>& Label) {
+		int guessV = guessSMExtra(inputs, MinMax, Label);
 		int answerV = getAnswer(inputs);
 		int error = calculateError(answerV, guessV);
 		updateWeightsExtra(error, inputs);
 
-		// if something gets weird start adding verbose output to get the exact weights everytime
-		/*
-		std::cout << "Error: " << error << " | Updated weights: [" << weights[0] << ", " << weights[1] << "]" << std::endl;
-		*/
+		// if something gets weird start adding verbose output to get the exact weights everytime, this is already implemented in the getinfo function
 	}
 
-	void getinfo() {
+	const void getinfo() {
 		std::cout << "weights[0]: " << weights[0] << " | weights[1]: " << weights[1] << std::endl;
 	}
 
 };
-
