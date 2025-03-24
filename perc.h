@@ -48,6 +48,9 @@ public:
 		else if (label == "MINMAX5") {
 			return 3;
 		}
+		else if (label == "MINMAX1") {
+			return 4;
+		}
 	}
 
 	static void Minmaxer_TwoDiff(std::vector<double>& inputs, std::vector<std::tuple<int, int>>& MinMaxArrays, std::vector<std::string>& Label) {
